@@ -1,33 +1,77 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#137f78"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="さんかくマスター"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><title>さんかくマスター</title><style>
 :root{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;color:#19333a;background:#f1f7f6}*{box-sizing:border-box}body{margin:0}main{max-width:700px;margin:auto;padding:18px 16px 80px}header{display:flex;align-items:center;justify-content:space-between}h1{font-size:24px;margin:8px 0 16px}h2{font-size:19px}button,input,select{font:inherit}button{border:0;border-radius:12px;background:#137f78;color:white;padding:13px 16px;font-weight:700;cursor:pointer}button.secondary{background:#e0efec;color:#155d57}button:disabled{opacity:.5}input,select{width:100%;padding:12px;border:1px solid #b9d3ce;border-radius:10px;background:white;font-size:17px}label{display:block;margin:12px 0 5px;font-weight:700}.card{background:white;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 2px 10px #183d3812}.tabs,.row{display:flex;gap:8px;flex-wrap:wrap}.tabs button{flex:1;padding:11px 8px}.tabs button:not(.active){background:#e1eeeb;color:#265b55}.muted{color:#647d7a;font-size:13px}.hidden{display:none!important}.diagram{width:100%;height:auto;max-height:300px}.diagram-wrap{position:relative;min-height:220px}.result-mark{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2}.result-mark span{font-size:clamp(100px,32vw,180px);line-height:1;font-weight:900;opacity:.88;text-shadow:0 3px 12px #ffffffcc}.result-mark.correct span{color:#16a34a}.result-mark.wrong span{color:#e53935}#feedback{font-weight:700;padding:12px;border-radius:10px;background:#e9f6ef;margin-top:12px}.stat{padding:12px;background:#edf7f5;border-radius:12px;margin:8px 0}#printArea{display:none}small{font-size:12px} @media print{body{background:white}main{display:none!important}#printArea{display:block!important;color:black;font-family:sans-serif;padding:0 8mm}.print-grid{display:grid;grid-template-columns:1fr 1fr;gap:7mm 10mm}.print-item{break-inside:avoid;border:1px solid #bbb;padding:3mm;height:58mm}.print-item svg{width:100%;height:40mm}.print-page{break-after:page}.print-page:last-child{break-after:auto}h2{margin:0 0 4mm}}
-</style></head><body><main><header><h1>📐 さんかくマスター</h1><span class="muted">すぐに学習・Ver.3</span></header><nav class="tabs"><button data-tab="study" class="active">問題を解く</button><button data-tab="print">プリント</button><button data-tab="records">学習記録</button></nav><section id="study" class="card"><label for="level">難易度</label><select id="level"><option value="easy">かんたん（10°刻み）</option><option value="normal" selected>ふつう（5°刻み）</option><option value="hard">むずかしい（1°刻み）</option></select><h2 id="questionTitle">角度 x を求めよう</h2><div class="diagram-wrap"><div id="diagram"></div><div id="resultMark" class="result-mark hidden" aria-live="polite"></div></div><label for="answer">答え（度）</label><input id="answer" type="number" inputmode="numeric" placeholder="例：65"><div class="row" style="margin-top:12px"><button id="check">答え合わせ</button><button id="next" class="secondary">次の問題</button></div><div id="feedback" class="hidden" aria-live="polite"></div></section><section id="print" class="card hidden"><h2>問題プリントを作る</h2><label for="printLevel">難易度</label><select id="printLevel"><option value="easy">かんたん</option><option value="normal" selected>ふつう</option><option value="hard">むずかしい</option></select><label for="count">問題数</label><select id="count"><option>5</option><option selected>10</option><option>20</option></select><div class="row" style="margin-top:16px"><button id="printQuestions">問題を印刷 / PDF保存</button><button id="printAnswers" class="secondary">解答を印刷 / PDF保存</button></div><p class="muted">同じ問題セットの解答を印刷できます。新しい問題セットは「問題を作り直す」で生成します。</p><button class="secondary" id="regenerate">問題を作り直す</button></section><section id="records" class="card hidden"><h2>学習記録</h2><div id="stats"></div><button class="secondary" id="resetStats">学習記録をリセット</button><p class="muted">学習記録はこの端末のブラウザに保存されます。名前の登録は不要です。</p></section></main><div id="printArea"></div><script>
-'use strict';const $=id=>document.getElementById(id);const KEY='sankaku-master-no-name-v3';let state={records:{total:0,correct:0}};let storageOK=true;try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&saved.records&&Number.isFinite(saved.records.total)&&Number.isFinite(saved.records.correct))state=saved}catch(e){storageOK=false}const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){storageOK=false}};const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
-function make(level){let step=level==='easy'?10:level==='normal'?5:1;let a,b;do{a=rand(2,13)*step;if(step===1)a=rand(20,135);b=rand(2,13)*step;if(step===1)b=rand(20,135)}while(a+b>=160||a+b<=45||180-a-b<20);return {a,b,c:180-a-b}}
-function svg(q,showAnswer=false){
- const R=Math.PI/180;
- const A={x:0,y:0},B={x:1,y:0};
- const C={x:Math.sin(q.b*R)/Math.sin(q.c*R)*Math.cos(q.a*R),y:Math.sin(q.b*R)/Math.sin(q.c*R)*Math.sin(q.a*R)};
- const pts=[A,B,C],minX=Math.min(...pts.map(p=>p.x)),maxX=Math.max(...pts.map(p=>p.x)),maxY=C.y;
- const w=maxX-minX,h=maxY||.01,scale=Math.min(230/w,135/h);
- const X=v=>165+(v.x-(minX+maxX)/2)*scale,Y=v=>112+(maxY/2-v.y)*scale;
- const p=pts.map(v=>({x:X(v),y:Y(v)}));
- // Put labels OUTSIDE each vertex, away from the triangle interior.
- // A and B sit below the baseline, while C sits above the peak.
- // This avoids labels overlapping even for narrow triangles.
- const labels=[
-  {x:p[0].x,y:p[0].y+30,t:q.a+'°'},
-  {x:p[1].x,y:p[1].y+30,t:q.b+'°'},
-  {x:p[2].x,y:p[2].y-22,t:showAnswer?q.c+'°':'x'}
- ];
- // Ensure the two bottom labels never touch when the base is visually short.
- if(Math.abs(labels[0].x-labels[1].x)<86){
-   const mid=(labels[0].x+labels[1].x)/2;
-   labels[0].x=mid-45;labels[1].x=mid+45;
+</style></head><body><main><header><h1>📐 さんかくマスター</h1><span class="muted">内角・外角・応用 Ver.4</span></header><nav class="tabs"><button data-tab="study" class="active">問題を解く</button><button data-tab="print">プリント</button><button data-tab="records">学習記録</button></nav><section id="study" class="card"><label for="level">難易度</label><select id="level"><option value="easy">かんたん（内角の基本）</option><option value="normal" selected>ふつう（内角と外角）</option><option value="hard">むずかしい（補助線の応用）</option></select><h2 id="questionTitle">角度 x を求めよう</h2><div class="diagram-wrap"><div id="diagram"></div><div id="resultMark" class="result-mark hidden" aria-live="polite"></div></div><label for="answer">答え（度）</label><input id="answer" type="number" inputmode="numeric" placeholder="例：65"><div class="row" style="margin-top:12px"><button id="check">答え合わせ</button><button id="next" class="secondary">次の問題</button></div><div id="feedback" class="hidden" aria-live="polite"></div></section><section id="print" class="card hidden"><h2>問題プリントを作る</h2><label for="printLevel">難易度</label><select id="printLevel"><option value="easy">かんたん</option><option value="normal" selected>ふつう</option><option value="hard">むずかしい</option></select><label for="count">問題数</label><select id="count"><option>5</option><option selected>10</option><option>20</option></select><div class="row" style="margin-top:16px"><button id="printQuestions">問題を印刷 / PDF保存</button><button id="printAnswers" class="secondary">解答を印刷 / PDF保存</button></div><p class="muted">同じ問題セットの解答を印刷できます。新しい問題セットは「問題を作り直す」で生成します。</p><button class="secondary" id="regenerate">問題を作り直す</button></section><section id="records" class="card hidden"><h2>学習記録</h2><div id="stats"></div><button class="secondary" id="resetStats">学習記録をリセット</button><p class="muted">学習記録はこの端末のブラウザに保存されます。名前の登録は不要です。</p></section></main><div id="printArea"></div><script>
+'use strict';const $=id=>document.getElementById(id);const KEY='sankaku-master-no-name-v4';let state={records:{total:0,correct:0}};let storageOK=true;try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&saved.records&&Number.isFinite(saved.records.total)&&Number.isFinite(saved.records.correct))state=saved}catch(e){storageOK=false}const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){storageOK=false}};const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+function make(level){
+ const kind=level==='easy'?'inner':level==='normal'?(Math.random()<.5?'inner':'outer'):(['inner','outer','cross'][rand(0,2)]);
+ if(kind==='cross'){
+  let a,b,c,t;do{a=rand(35,75);b=rand(35,75);c=180-a-b;t=rand(25,Math.min(90,155-c))}while(c<30||c>95||c+t>155||180-c-t<25);
+  return {kind,a,b,c,t,answer:c+t};
  }
- return `<svg class="diagram" viewBox="0 0 330 230" role="img" aria-label="角度${q.a}度と${q.b}度の三角形。残りの角度を求める"><polygon points="${p.map(v=>v.x+','+v.y).join(' ')}" fill="#e0f3ee" stroke="#137f78" stroke-width="2.5" stroke-linejoin="round"/>${labels.map(l=>`<text x="${l.x}" y="${l.y}" fill="#174f4a" font-size="18" font-weight="bold" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="4" stroke-linejoin="round">${l.t}</text>`).join('')}</svg>`;
+ let a,b,c;do{a=rand(25,125);b=rand(25,125);c=180-a-b}while(c<25||c>130||a+b>155);
+ if(kind==='inner')return {kind,a,b,c,answer:c};
+ // Exterior angle at B equals sum of remote interior angles A+C.
+ return {kind,a,b,c,answer:a+c};
+}
+const fmt=n=>Math.round(n*10)/10;
+function svg(q,showAnswer=false){
+ const R=Math.PI/180,rad=x=>x*R;
+ // Triangle coordinates are determined by the actual angle values.
+ const A={x:0,y:0},B={x:1,y:0};
+ const len=Math.sin(rad(q.b))/Math.sin(rad(q.c));
+ const C={x:len*Math.cos(rad(q.a)),y:len*Math.sin(rad(q.a))};
+ const pts=[A,B,C];let D,E,F;
+ if(q.kind==='cross'){
+  const smallRight=180-q.c-q.t;
+  const sideCA=Math.hypot(C.x-A.x,C.y-A.y),sideCB=Math.hypot(C.x-B.x,C.y-B.y);
+  // Choose the segment lengths via sine rule so the top-left angle is exactly t.
+  const ratio=Math.sin(rad(q.t))/Math.sin(rad(smallRight));
+  const frac=Math.min(.62,.62*sideCB/(ratio*sideCA));
+  const dLen=frac*sideCA,eLen=dLen*ratio;
+  D={x:C.x+(A.x-C.x)*dLen/sideCA,y:C.y+(A.y-C.y)*dLen/sideCA};
+  E={x:C.x+(B.x-C.x)*eLen/sideCB,y:C.y+(B.y-C.y)*eLen/sideCB};
+  const ex=E.x-D.x,ey=E.y-D.y,n=Math.hypot(ex,ey);F={x:E.x+ex/n*.38,y:E.y+ey/n*.38};
+  pts.push(D,E,F);
+ }else if(q.kind==='outer'){
+  F={x:B.x+.38,y:B.y};pts.push(F);
+ }
+ const minX=Math.min(...pts.map(p=>p.x)),maxX=Math.max(...pts.map(p=>p.x));
+ const maxY=Math.max(...pts.map(p=>p.y)),minY=Math.min(...pts.map(p=>p.y));
+ const sc=Math.min(230/Math.max(.1,maxX-minX),140/Math.max(.1,maxY-minY));
+ const P=v=>({x:165+(v.x-(minX+maxX)/2)*sc,y:116+(maxY+minY-2*v.y)*sc/2});
+ const a=P(A),b=P(B),c=P(C),d=D&&P(D),e=E&&P(E),f=F&&P(F);
+ const poly=`<polygon points="${[a,b,c].map(v=>`${v.x},${v.y}`).join(' ')}" fill="#e0f3ee" stroke="#137f78" stroke-width="2.6" stroke-linejoin="round"/>`;
+ const line=(u,v)=>`<line x1="${u.x}" y1="${u.y}" x2="${v.x}" y2="${v.y}" stroke="#137f78" stroke-width="2.6" stroke-linecap="round"/>`;
+ const arc=(v,p1,p2,color='#ed9a35',radius=22)=>{
+  const u={x:p1.x-v.x,y:p1.y-v.y},w={x:p2.x-v.x,y:p2.y-v.y};
+  const l1=Math.hypot(u.x,u.y),l2=Math.hypot(w.x,w.y);
+  const start=Math.atan2(u.y,u.x),delta=Math.atan2(u.x*w.y-u.y*w.x,u.x*w.x+u.y*w.y);
+  const p={x:v.x+radius*u.x/l1,y:v.y+radius*u.y/l1};
+  const q2={x:v.x+radius*w.x/l2,y:v.y+radius*w.y/l2};
+  return `<path d="M ${p.x} ${p.y} A ${radius} ${radius} 0 0 ${delta>0?1:0} ${q2.x} ${q2.y}" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>`;
+ };
+ const label=(v,t,dx,dy,col='#174f4a')=>`<text x="${v.x+dx}" y="${v.y+dy}" fill="${col}" font-size="18" font-weight="bold" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="4" stroke-linejoin="round">${t}</text>`;
+ const deg=n=>`${n}°`;
+ let parts=[poly],marks=[];
+ if(q.kind==='inner'){
+  parts.push(arc(a,b,c),arc(b,a,c),arc(c,a,b));
+  marks=[label(a,deg(q.a),-14,31),label(b,deg(q.b),14,31),label(c,showAnswer?deg(q.answer):'x',0,-19)];
+ }else if(q.kind==='outer'){
+  parts.push(line(b,f),arc(a,b,c),arc(c,a,b),arc(b,c,f,'#5a75d6',29));
+  marks=[label(a,deg(q.a),-14,31),label(c,deg(q.c),0,-19),label(b,showAnswer?deg(q.answer):'x',32,-13,'#3f5ab8')];
+ }else{
+  parts.push(line(d,f),arc(a,b,c),arc(b,a,c),arc(d,c,e,'#e89530',19),arc(e,c,f,'#5a75d6',25));
+  marks=[label(a,deg(q.a),-12,30),label(b,deg(q.b),12,30),label(d,deg(q.t),12,-13),label(e,showAnswer?deg(q.answer):'x',31,-11,'#3f5ab8')];
+ }
+ return `<svg class="diagram" viewBox="0 0 330 230" role="img" aria-label="${q.kind==='cross'?'補助線のある三角形':q.kind==='outer'?'三角形の外角':'三角形の内角'}の問題">${parts.join('')}${marks.join('')}</svg>`;
+}
+function explanation(q){
+ if(q.kind==='inner')return `180° − ${q.a}° − ${q.b}° = ${q.answer}°`;
+ if(q.kind==='outer')return `外角 = 離れた2つの内角の和 = ${q.a}° + ${q.c}° = ${q.answer}°`;
+ return `頂点の角は 180° − ${q.a}° − ${q.b}° = ${q.c}°。外角 x = ${q.t}° + ${q.c}° = ${q.answer}°`;
 }
 let current=make('normal'),answered=false,worksheet=[];function renderQ(){answered=false;$('resultMark').className='result-mark hidden';$('resultMark').innerHTML='';$('answer').value='';$('feedback').classList.add('hidden');$('diagram').innerHTML=svg(current)}function next(){current=make($('level').value);renderQ()}function stats(){let r=state.records;$('stats').innerHTML=`<div class="stat">解いた問題：<b>${r.total}</b> 問</div><div class="stat">正解：<b>${r.correct}</b> 問</div><div class="stat">正解率：<b>${r.total?Math.round(r.correct/r.total*100):0}%</b></div>`}
-$('check').onclick=()=>{if(answered)return;let raw=$('answer').value;if(raw.trim()===''||!Number.isFinite(Number(raw)))return alert('答えを入力してね');answered=true;let ok=Number(raw)===current.c,r=state.records;r.total++;if(ok)r.correct++;$('resultMark').className='result-mark '+(ok?'correct':'wrong');$('resultMark').innerHTML='<span>'+(ok?'○':'×')+'</span>';save();$('feedback').classList.remove('hidden');$('feedback').textContent=`${ok?'🎉 正解！':'もう一歩！ 正解は '+current.c+'°'}　180° − ${current.a}° − ${current.b}° = ${current.c}°`;stats()};$('next').onclick=next;$('level').onchange=next;$('resetStats').onclick=()=>{if(confirm('学習記録をリセットしますか？')){state.records={total:0,correct:0};save();stats()}};document.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===btn));['study','print','records'].forEach(id=>$(id).classList.toggle('hidden',id!==btn.dataset.tab));if(btn.dataset.tab==='records')stats()});
-function generateSheet(){worksheet=Array.from({length:Number($('count').value)},()=>make($('printLevel').value))}function printSheet(answers){if(!worksheet.length)generateSheet();let pages=[];for(let i=0;i<worksheet.length;i+=8){let chunk=worksheet.slice(i,i+8);pages.push(`<section class="print-page"><h2>さんかくマスター　${answers?'解答':'問題'}　${Math.floor(i/8)+1}ページ</h2><div class="print-grid">${chunk.map((q,j)=>`<div class="print-item"><b>第${i+j+1}問</b>${svg(q,answers)}<div>${answers?`答え：${q.c}°　180 − ${q.a} − ${q.b} = ${q.c}`:'答え：＿＿＿＿°'}</div></div>`).join('')}</div></section>`)}$('printArea').innerHTML=pages.join('');window.print()}
+$('check').onclick=()=>{if(answered)return;let raw=$('answer').value;if(raw.trim()===''||!Number.isFinite(Number(raw)))return alert('答えを入力してね');answered=true;let ok=Number(raw)===current.answer,r=state.records;r.total++;if(ok)r.correct++;$('resultMark').className='result-mark '+(ok?'correct':'wrong');$('resultMark').innerHTML='<span>'+(ok?'○':'×')+'</span>';save();$('feedback').classList.remove('hidden');$('feedback').textContent=`${ok?'🎉 正解！':'もう一歩！ 正解は '+current.answer+'°'}　${explanation(current)}`;stats()};$('next').onclick=next;$('level').onchange=next;$('resetStats').onclick=()=>{if(confirm('学習記録をリセットしますか？')){state.records={total:0,correct:0};save();stats()}};document.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===btn));['study','print','records'].forEach(id=>$(id).classList.toggle('hidden',id!==btn.dataset.tab));if(btn.dataset.tab==='records')stats()});
+function generateSheet(){worksheet=Array.from({length:Number($('count').value)},()=>make($('printLevel').value))}function printSheet(answers){if(!worksheet.length)generateSheet();let pages=[];for(let i=0;i<worksheet.length;i+=8){let chunk=worksheet.slice(i,i+8);pages.push(`<section class="print-page"><h2>さんかくマスター　${answers?'解答':'問題'}　${Math.floor(i/8)+1}ページ</h2><div class="print-grid">${chunk.map((q,j)=>`<div class="print-item"><b>第${i+j+1}問</b>${svg(q,answers)}<div>${answers?`答え：${q.answer}°　${explanation(q)}`:'答え：＿＿＿＿°'}</div></div>`).join('')}</div></section>`)}$('printArea').innerHTML=pages.join('');window.print()}
 $('regenerate').onclick=()=>{generateSheet();alert('新しい問題セットを作りました')};$('printQuestions').onclick=()=>printSheet(false);$('printAnswers').onclick=()=>printSheet(true);$('printLevel').onchange=()=>worksheet=[];$('count').onchange=()=>worksheet=[];renderQ();stats();if(!storageOK){let warning=document.createElement('p');warning.className='muted';warning.textContent='この開き方では学習記録を保存できません。問題は解けます。';document.querySelector('#records').appendChild(warning)}if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script></body></html>
